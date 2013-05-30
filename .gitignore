@@ -1,0 +1,16 @@
+target/
+Thumbs.db
+obj/
+*.bak
+*.log
+*.orig
+target/
+.idea/
+*.iml
+*.ipr
+*.iws
+*.sdf
+*.suo
+Debug/
+Release/
+*.ipch
