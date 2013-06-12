@@ -43,13 +43,19 @@ import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.Publisher;
 import hudson.tasks.Recorder;
 import hudson.util.FormValidation;
+import hudson.util.ListBoxModel;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.QueryParameter;
 
 import javax.servlet.ServletException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -61,6 +67,7 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 public class RichTextPublisher extends Recorder {
+    private static final Log log = LogFactory.getLog(RichTextPublisher.class);
 
     private static final transient Pattern FILE_VAR_PATTERN = Pattern.compile("\\$\\{(file|file_sl):([^\\}]+)\\}", Pattern.CASE_INSENSITIVE);
     private String stableText;
@@ -68,14 +75,22 @@ public class RichTextPublisher extends Recorder {
     private String failedText;
     private Boolean unstableAsStable = true;
     private Boolean failedAsStable = true;
+    private String parserName;
+
+    private transient MarkupParser markupParser;
 
     @DataBoundConstructor
-    public RichTextPublisher(String stableText, String unstableText, String failedText, Boolean unstableAsStable, Boolean failedAsStable) {
+    public RichTextPublisher(String stableText, String unstableText, String failedText, Boolean unstableAsStable, Boolean failedAsStable, String parserName) {
         this.stableText = stableText;
         this.unstableText = unstableText;
         this.failedText = failedText;
-        this.unstableAsStable = unstableAsStable == null ? true: unstableAsStable;
-        this.failedAsStable = failedAsStable == null ? true: failedAsStable;
+        this.unstableAsStable = unstableAsStable == null ? true : unstableAsStable;
+        this.failedAsStable = failedAsStable == null ? true : failedAsStable;
+        setParserName(parserName);
+    }
+
+    public List<String> getMarkupParserNames() {
+        return DescriptorImpl.markupParserNames;
     }
 
     public String getStableText() {
@@ -118,6 +133,18 @@ public class RichTextPublisher extends Recorder {
         this.failedAsStable = failedAsStable;
     }
 
+    public String getParserName() {
+        return parserName;
+    }
+
+    public void setParserName(String parserName) {
+        if (parserName == null || !DescriptorImpl.markupParsers.containsKey(parserName)) {
+            parserName = "HTML";
+        }
+        this.parserName = parserName;
+        this.markupParser = DescriptorImpl.markupParsers.get(parserName);
+    }
+
     @Override
     public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
         final String text;
@@ -150,14 +177,22 @@ public class RichTextPublisher extends Recorder {
             start = matcher.end();
         }
 
-        AbstractRichTextAction action = new BuildRichTextAction(build, replaceVars(text, vars));
+        AbstractRichTextAction action = new BuildRichTextAction(build, getMarkupParser().parse(replaceVars(text, vars)));
         build.addAction(action);
         build.save();
 
         return true;
     }
 
+    private MarkupParser getMarkupParser() {
+        if (markupParser == null) {
+            markupParser = DescriptorImpl.markupParsers.get(parserName);
+        }
+        return markupParser;
+    }
+
     private String replaceVars(String publishText, Map<String, String> vars) {
+
         for (Map.Entry<String, String> var : vars.entrySet()) {
             String key = String.format("${%s}", var.getKey());
             String value = var.getValue();
@@ -177,6 +212,47 @@ public class RichTextPublisher extends Recorder {
 
     @Extension
     public static final class DescriptorImpl extends BuildStepDescriptor<Publisher> {
+
+        private static transient Map<String, MarkupParser> markupParsers;
+        private static transient List<String> markupParserNames;
+
+        static {
+            loadParsers();
+        }
+
+        private static void loadParsers() {
+            Properties properties = new Properties();
+            InputStream stream = DescriptorImpl.class.getResourceAsStream("/parsers.properties");
+            try {
+                properties.load(stream);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } finally {
+                IOUtils.closeQuietly(stream);
+            }
+
+            markupParsers = new HashMap<String, MarkupParser>();
+            markupParserNames = new ArrayList<String>();
+            for (Object o : properties.values()) {
+                try {
+                    MarkupParser parser = (MarkupParser) Class.forName(o.toString()).newInstance();
+                    String name = parser.getName();
+                    markupParserNames.add(name);
+                    markupParsers.put(name, parser);
+                } catch (Exception e) {
+                    log.error(e);
+                }
+            }
+        }
+
+        public HttpResponse doFillParserNameItems() {
+            loadParsers();
+            ListBoxModel model = new ListBoxModel();
+            for (String name : markupParserNames) {
+                model.add(name, name);
+            }
+            return model;
+        }
 
         public FormValidation doCheckPublishText(@AncestorInPath AbstractProject project, @QueryParameter String value) throws IOException, ServletException {
             try {

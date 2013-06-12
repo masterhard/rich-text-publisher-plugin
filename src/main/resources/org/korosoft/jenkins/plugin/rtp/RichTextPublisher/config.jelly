@@ -34,24 +34,23 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
          xmlns:l="/lib/layout">
     <j:set var="yuiSuffix" value="min"/>
     <l:yui module="editor"/>
+    <f:entry title="Markup language" field="parserName">
+        <f:select/>
+    </f:entry>
     <f:entry title="Publish rich text for stable builds" field="stableText">
-        <f:richtextarea name="_.stableText" value="${instance['stableText']}"/>
+        <f:textarea/>
     </f:entry>
     <f:advanced>
         <f:entry title="The same text for unstable builds as for stable" field="unstableAsStable">
             <f:checkbox default="true"/>
         </f:entry>
         <f:entry title="Publish rich text for unstable builds" field="unstableText">
-<!-- Jenkins does not support multiple rich text areas under yet -->
-<!--            <f:richtextarea name="_.unstableText" value="${instance['unstableText']}"/>-->
             <f:textarea/>
         </f:entry>
         <f:entry title="The same text for failed builds as for stable" field="failedAsStable">
             <f:checkbox default="true"/>
         </f:entry>
         <f:entry title="Publish rich text for failed builds" field="failedText">
-            <!-- Jenkins does not support multiple rich text areas under yet -->
-<!--            <f:richtextarea name="_.failedText" value="${instance['failedText']}"/>-->
             <f:textarea/>
         </f:entry>
     </f:advanced>
