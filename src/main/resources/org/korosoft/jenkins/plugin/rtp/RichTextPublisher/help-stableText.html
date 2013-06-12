@@ -1,0 +1,9 @@
+<p>
+    Specify rich text to be published on build abd job summary pages for stable and (if corresponding checkboxes are selected) for unstable and failed builds. Build parameters may be put in <code>${PARAM_NAME}</code> format.
+    Global environment variable values may be put in <code>${ENV:VAR_NAME}</code> format.
+</p>
+
+<p>
+    Content of specified files may be also added to summary page. Use <code>${FILE:path/to/file.txt}</code> to put entire file contents.
+    Use <code>${FILE_SL:path/to/file.txt}</code> to put file contents as single line (all CR and LF symbols are skipped).
+</p>
